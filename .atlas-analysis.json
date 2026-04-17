@@ -1,0 +1,95 @@
+{
+  "projectType": "saas",
+  "projectName": "Broń Vault",
+  "projectDescription": "An open-source stealer logs parser and visualization dashboard that automatically ingests ZIP log files, structures the data, and presents credentials, device information, and domain intelligence through a searchable web interface.",
+  "theme": "almond",
+  "primaryColor": "#f3e1be",
+  "lightColor": "#948c7c",
+  "darkColor": "#842745",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/uploading-logs",
+              "features/credential-search",
+              "features/device-detail",
+              "features/domain-discovery",
+              "features/dashboard",
+              "features/domain-monitoring"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment-variables",
+              "configuration/storage",
+              "configuration/users-and-roles"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/docker-setup",
+              "operations/development",
+              "operations/debug-zip"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/search-credentials",
+              "api/search-domain",
+              "api/upload",
+              "api/upload-status"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Drag-and-drop ZIP stealer log ingestion with real-time progress tracking",
+    "Advanced credential search with AND/OR/NOT boolean operators",
+    "Device detail view with OS, hardware, credentials, software, and file tree",
+    "Asset discovery for subdomains, paths, and exposed credentials per domain",
+    "Statistical dashboard with country heatmap and browser/software analytics",
+    "Domain monitoring with webhook alerts (Slack, custom APIs)",
+    "S3-compatible object storage support (AWS S3, MinIO)",
+    "REST API v1 with API-key authentication for programmatic access",
+    "Role-based access control with Admin and Analyst roles",
+    "ClickHouse analytics backend with real-time MySQL replication for fast queries"
+  ],
+  "publicApiSurface": [
+    "POST /api/v1/upload — Upload a stealer log ZIP file (admin keys only); returns jobId",
+    "GET /api/v1/upload/status/{jobId} — Poll async upload job status and progress",
+    "POST /api/v1/search/credentials — Search credentials by email, username, or password",
+    "GET /api/v1/search/domain — Search subdomains, paths, and credentials for a domain",
+    "GET /api/v1/device/{deviceId} — Retrieve device details",
+    "GET /api/v1/lookup — Lookup endpoint for device/credential correlation",
+    "GET /api/v1/summary — Summary statistics endpoint"
+  ]
+}

@@ -1,80 +1,147 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Install Broń Vault with Docker in under 5 minutes"
+description: "Learn how to clone, configure, and run Broń Vault locally using Docker Compose in under five minutes, then upload your first stealer log file."
 ---
 
-## Get started in three steps
+Broń Vault is deployed as a set of Docker services. This guide walks you through every step — from cloning the repository to uploading your first stealer log — using the recommended Docker Compose quick-start path.
 
-Get your documentation site running locally and make your first customization.
+<Warning>
+  Broń Vault is intended for use in secure, isolated environments only. Do **not** expose it to public networks or deploy it in production. Use it exclusively on a trusted local machine or isolated lab network.
+</Warning>
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Before you begin, ensure you have the following installed:
 
-### Step 2: Deploy your changes
+| Requirement | Notes |
+|---|---|
+| **Docker** + **Docker Compose v2** | Docker Desktop on macOS/Windows, or `docker-ce` + `docker-compose-plugin` on Linux |
+| **Git** | For cloning the repository |
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+**Tested environments:** Ubuntu 24.04 LTS (Desktop and Server), Kali Linux 2025.3, macOS Sequoia.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+On Ubuntu you can install Docker automatically using the bundled script:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+bash install_docker.sh
+```
 
-### Step 3: Go live
+<Note>
+  After running `install_docker.sh`, log out and back in so your user is added to the `docker` group before continuing.
+</Note>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ITSEC-Research/bron-vault
+    cd bron-vault
+    ```
+  </Step>
+
+  <Step title="Configure your environment">
+    Copy the example environment file and set secure passwords for all services:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Open `.env` and replace the placeholder values:
+
+    | Variable | Description | Example |
+    |---|---|---|
+    | `JWT_SECRET` | Secret for signing auth tokens. Minimum 32 characters. | `openssl rand -hex 32` |
+    | `MYSQL_ROOT_PASSWORD` | MySQL root password | `MySecureRootPass!` |
+    | `MYSQL_USER` | Application database user | `bronvault` |
+    | `MYSQL_PASSWORD` | Application database password | `MySecureAppPass!` |
+    | `CLICKHOUSE_USER` | ClickHouse user | `default` |
+    | `CLICKHOUSE_PASSWORD` | ClickHouse password | `MyClickHousePass!` |
+    | `CLICKHOUSE_DB` | ClickHouse database name | `bronvault_analytics` |
+    | `SYNC_USER` | Internal MySQL→ClickHouse replication user | `clickhouse_sync` |
+    | `SYNC_PASSWORD` | Password for replication user | `MySyncPass!` |
+
+    <Warning>
+      Change **all** default passwords before starting the services. Never commit your `.env` file to version control.
+    </Warning>
+  </Step>
+
+  <Step title="Start all services">
+    ```bash
+    bash docker-start.sh
+    ```
+
+    The script will:
+    - Build Docker images (first run only — subsequent starts are faster)
+    - Start MySQL, ClickHouse, MinIO, and the Next.js application
+    - Run the setup container to configure MaterializedMySQL replication and initialize all database tables
+    - Print service status and access URLs once everything is ready
+
+    <Note>
+      First startup takes approximately 60 seconds while MySQL and ClickHouse initialize and the setup script configures replication.
+    </Note>
+  </Step>
+
+  <Step title="Open the application">
+    Navigate to `http://localhost:3000` in your browser. Log in with the default credentials:
+
+    | Field | Value |
+    |---|---|
+    | Email | `admin@bronvault.local` |
+    | Password | `admin` |
+
+    <Warning>
+      Change the default password immediately after first login via **User Settings → Change Password**.
+    </Warning>
+  </Step>
+
+  <Step title="Upload your first log file">
+    Navigate to **Upload** in the sidebar, drag and drop a stealer log `.zip` file onto the upload area, and click **Upload**. Real-time progress is shown as the parser extracts devices, credentials, files, and software from the archive.
+  </Step>
+</Steps>
+
+## Service URLs
+
+Once all services are running:
+
+| Service | URL | Notes |
+|---|---|---|
+| Broń Vault App | `http://localhost:3000` | Main web interface |
+| ClickHouse Play | `http://localhost:8123/play` | Interactive SQL query UI |
+| ClickHouse HTTP API | `http://localhost:8123` | Direct API access |
+| MySQL | `localhost:3306` | Primary database |
+| MinIO S3 API | `http://localhost:9001` | Object storage endpoint |
+| MinIO Console | `http://localhost:9002` | MinIO web management UI |
+
+## Useful commands
+
+```bash
+# Check service status
+./docker-status.sh
+
+# Stream logs from all services
+docker compose logs -f
+
+# Stop all services
+docker compose down
+
+# Restart services
+docker compose restart
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Upload Logs" icon="upload" href="/features/uploading-logs">
+    Learn about supported log formats and how the parsing pipeline works
+  </Card>
+  <Card title="Credential Search" icon="magnifying-glass" href="/features/credential-search">
+    Search credentials across all uploaded logs with Boolean operators
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Use the REST API to automate uploads and searches programmatically
+  </Card>
+  <Card title="Development Setup" icon="terminal" href="/operations/development">
+    Run the app locally with hot reload for development
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

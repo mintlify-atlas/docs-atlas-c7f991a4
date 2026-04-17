@@ -1,0 +1,172 @@
+---
+title: "Docker Setup: Run Broń Vault with Docker Compose"
+description: "Deploy Broń Vault using Docker Compose. Covers prerequisites, Ubuntu Docker installation, service startup, default credentials, and useful management commands."
+---
+
+Docker is the recommended way to run Broń Vault. A single script builds every image, starts MySQL, ClickHouse, MinIO, and the Next.js application, then configures the MaterializedMySQL replication layer automatically — no manual database setup required.
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed and running:
+
+- **Docker** and **Docker Compose v2** (`docker compose version` must succeed — the standalone `docker-compose` binary is not supported)
+- **Git** (to clone the repository)
+
+### Tested environments
+
+Broń Vault has been verified on the following operating systems:
+
+- Ubuntu 24.04 LTS (Desktop and Server)
+- Kali Linux 2025.3
+- macOS Sequoia
+
+### Installing Docker on Ubuntu
+
+If you are on Ubuntu and Docker is not yet installed, run the provided install script. It adds the official Docker APT repository, installs `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and `docker-compose-plugin`, then adds your user to the `docker` group.
+
+```bash
+bash install_docker.sh
+```
+
+<Warning>
+After the script completes, **log out and log back in** before continuing. The `docker` group membership is applied only at session start.
+</Warning>
+
+If you are on a non-Ubuntu system, follow the [Docker official installation guide](https://docs.docker.com/engine/install/) for your platform.
+
+## Quick start
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ITSEC-Research/bron-vault
+    cd bron-vault
+    ```
+  </Step>
+
+  <Step title="Configure the environment">
+    Copy the example environment file and edit it with secure passwords before starting any services.
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Open `.env` and replace every `change_me_*` placeholder. The file documents what each variable controls. At minimum, change these values:
+
+    | Variable | Purpose |
+    |---|---|
+    | `MYSQL_ROOT_PASSWORD` | MySQL root account |
+    | `MYSQL_PASSWORD` | App database user |
+    | `CLICKHOUSE_PASSWORD` | ClickHouse user |
+    | `SYNC_PASSWORD` | Internal replication user |
+    | `JWT_SECRET` | Token signing secret (min 32 chars) |
+
+    <Tip>
+    Generate a strong JWT secret with: `openssl rand -hex 32`
+    </Tip>
+  </Step>
+
+  <Step title="Start all services">
+    ```bash
+    bash docker-start.sh
+    ```
+
+    The script performs the following in sequence:
+
+    1. Detects Docker and Docker Compose v2; on Ubuntu, it offers to run `install_docker.sh` automatically if Docker is missing.
+    2. Creates the `uploads/chunks` and `uploads/extracted_files` directories on the host.
+    3. Runs `docker compose up -d --build`, which builds images (using layer cache on subsequent runs) and starts all five containers.
+    4. Waits briefly, then calls `docker-status.sh` to print service status and access URLs.
+
+    The first startup takes approximately 60 seconds while MySQL initialises and the setup container configures the replication user and ClickHouse `MaterializedMySQL` database.
+  </Step>
+
+  <Step title="Open the application">
+    Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
+  </Step>
+</Steps>
+
+## Default login credentials
+
+<Warning>
+Change the default password immediately after your first login.
+</Warning>
+
+| Field | Value |
+|---|---|
+| Email | `admin@bronvault.local` |
+| Password | `admin` |
+
+## Service URLs
+
+Once all containers are running, the following endpoints are available:
+
+<CardGroup cols={2}>
+  <Card title="Broń Vault App" icon="globe">
+    [http://localhost:3000](http://localhost:3000)
+  </Card>
+  <Card title="ClickHouse Play" icon="chart-bar">
+    [http://localhost:8123/play](http://localhost:8123/play)
+  </Card>
+  <Card title="ClickHouse HTTP API" icon="database">
+    [http://localhost:8123](http://localhost:8123)
+  </Card>
+  <Card title="MySQL" icon="server">
+    `localhost:3306`
+  </Card>
+  <Card title="MinIO S3 API" icon="cloud">
+    [http://localhost:9001](http://localhost:9001)
+  </Card>
+  <Card title="MinIO Console" icon="layout-dashboard">
+    [http://localhost:9002](http://localhost:9002)
+  </Card>
+</CardGroup>
+
+## Useful commands
+
+**Check service status**
+
+```bash
+bash docker-status.sh
+```
+
+**Stream logs from all containers**
+
+```bash
+docker compose logs -f
+```
+
+**Stream logs from a single service**
+
+```bash
+docker compose logs -f app
+docker compose logs -f mysql
+docker compose logs -f clickhouse
+```
+
+**Stop all services**
+
+```bash
+docker compose down
+```
+
+**Restart all services**
+
+```bash
+docker compose restart
+```
+
+## What docker-start.sh does
+
+The script is a thin wrapper around `docker compose up -d --build`. Its main job is to:
+
+- Validate that Docker and Docker Compose v2 are present and the Docker daemon is reachable.
+- Create local upload directories (`uploads/chunks`, `uploads/extracted_files`) that the app container mounts.
+- Trigger `docker compose up -d --build` so images are (re)built only when the `Dockerfile` or context has changed.
+- Call `docker-status.sh` after startup to surface the access URLs and credentials in one place.
+
+The `setup` container runs once after MySQL and ClickHouse become healthy. It creates the replication user in MySQL, enables the `MaterializedMySQL` experimental feature in ClickHouse, and creates the analytics database that replicates data from MySQL in real time. The container exits with code 0 on success; subsequent `docker compose up` invocations skip it because its `restart` policy is `"no"`.
+
+<Note>
+The `app` container depends on the `setup` container completing successfully (`condition: service_completed_successfully`), so the Next.js application will not start until replication is configured.
+</Note>

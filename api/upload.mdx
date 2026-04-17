@@ -1,0 +1,158 @@
+---
+title: "Upload Stealer Logs — POST /api/v1/upload"
+description: "Submit a ZIP stealer log archive via multipart/form-data. Returns a job ID immediately; use the status endpoint to track async processing progress."
+---
+
+The upload endpoint accepts a `.zip` stealer log archive and immediately queues it for background processing. The API always returns a `202 Accepted` response with a `jobId`—processing happens asynchronously. Use [GET /api/v1/upload/status/{jobId}](/api/upload-status) to poll progress and retrieve final statistics once the job completes.
+
+- **Method:** `POST`
+- **Path:** `/api/v1/upload`
+- **Auth:** `admin` API key only
+- **Content-Type:** `multipart/form-data`
+
+<Warning>
+  This endpoint requires an **admin** API key. Analyst keys receive a `403 Forbidden` response. Session-based (browser) users are not supported on this endpoint.
+</Warning>
+
+<Info>
+  The maximum file size is configurable in **Settings → Upload**. The API enforces the same limit as the web interface. If you exceed the limit, the server responds with `FILE_TOO_LARGE` and includes the `maxSize` (bytes) and `actualSize` (bytes) fields in the error body.
+</Info>
+
+## Request
+
+Send the archive as a `file` field in a `multipart/form-data` body. Only `.zip` files are accepted.
+
+<ParamField body="file" type="file" required>
+  The `.zip` archive to upload. Must have a `.zip` extension. The maximum file size is set in **Settings → Upload** and defaults to the configured `maxFileSize` value.
+</ParamField>
+
+## Response — 202 Accepted
+
+The endpoint always returns `202` when the file is accepted. It does not wait for processing to finish.
+
+<ResponseField name="success" type="boolean" required>
+  Always `true` for a `202` response.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable confirmation that processing has started.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="jobId" type="string">
+      Unique identifier for this upload job. Use this value with the status endpoint to track progress.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Initial job status. Always `"pending"` at submission time.
+    </ResponseField>
+    <ResponseField name="statusUrl" type="string">
+      Relative URL to poll for job progress, e.g. `/api/v1/upload/status/{jobId}`.
+    </ResponseField>
+    <ResponseField name="filename" type="string">
+      Original filename of the uploaded archive as received by the server.
+    </ResponseField>
+    <ResponseField name="fileSize" type="number">
+      File size in bytes.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error responses
+
+| Code | HTTP | Description |
+|------|------|-------------|
+| `MISSING_FILE` | 400 | No `file` field in the form data |
+| `INVALID_FILE_TYPE` | 400 | File does not have a `.zip` extension |
+| `FILE_TOO_LARGE` | 400 | File exceeds the configured maximum size |
+| `SAVE_ERROR` | 500 | File could not be written to temporary storage |
+| `UPLOAD_ERROR` | 500 | Unexpected error during upload processing |
+| `INVALID_API_KEY` | 401 | Key is missing or invalid |
+| `INSUFFICIENT_PERMISSIONS` | 403 | Key role is not `admin` |
+
+The `FILE_TOO_LARGE` response includes two extra fields:
+
+```json
+{
+  "success": false,
+  "error": "File too large. Maximum size is 500 MB",
+  "code": "FILE_TOO_LARGE",
+  "maxSize": 524288000,
+  "actualSize": 620000000
+}
+```
+
+## Tracking progress
+
+After submitting an upload, poll the `statusUrl` returned in the response body until `status` is `completed` or `failed`. A polling interval of **5–10 seconds** is recommended to avoid unnecessary load.
+
+See [Upload Status](/api/upload-status) for the full status response schema.
+
+## Examples
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url http://localhost:3000/api/v1/upload \
+  --header "Authorization: Bearer bv_YourApiKeyHere" \
+  --form "file=@/path/to/stealer-logs.zip"
+```
+
+```python Python
+import requests
+
+with open("/path/to/stealer-logs.zip", "rb") as f:
+    response = requests.post(
+        "http://localhost:3000/api/v1/upload",
+        headers={"Authorization": "Bearer bv_YourApiKeyHere"},
+        files={"file": ("stealer-logs.zip", f, "application/zip")},
+    )
+
+data = response.json()
+print("Job ID:", data["data"]["jobId"])
+print("Status URL:", data["data"]["statusUrl"])
+```
+
+</CodeGroup>
+
+### Success response
+
+```json
+{
+  "success": true,
+  "message": "Upload accepted. Processing started in background.",
+  "data": {
+    "jobId": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "pending",
+    "statusUrl": "/api/v1/upload/status/550e8400-e29b-41d4-a716-446655440000",
+    "filename": "stealer-logs.zip",
+    "fileSize": 104857600
+  }
+}
+```
+
+### Polling until completion
+
+```python
+import time
+import requests
+
+BASE = "http://localhost:3000"
+HEADERS = {"Authorization": "Bearer bv_YourApiKeyHere"}
+
+# Submit upload
+with open("stealer-logs.zip", "rb") as f:
+    r = requests.post(f"{BASE}/api/v1/upload", headers=HEADERS,
+                      files={"file": ("stealer-logs.zip", f, "application/zip")})
+job = r.json()["data"]
+status_url = BASE + job["statusUrl"]
+
+# Poll until done
+while True:
+    status = requests.get(status_url, headers=HEADERS).json()["data"]
+    print(f"Status: {status['status']}  Progress: {status['progress']}%")
+    if status["status"] in ("completed", "failed", "cancelled"):
+        break
+    time.sleep(8)
+```

@@ -1,0 +1,62 @@
+---
+title: "Dashboard: Statistical Overview of Your Log Data"
+description: "The dashboard aggregates all uploaded logs into credential counts, top passwords, TLD distribution, browser stats, software installed, and a country heatmap."
+---
+
+The Dashboard is the first screen most analysts open after a new upload. It aggregates everything in the database into a set of clear visualisations that answer the most common strategic questions: how much data do we have, what passwords keep appearing, which countries are most affected, and what software was running on compromised machines?
+
+All charts support **date range filtering** — use the date range selector at the top of the page to scope the statistics to a specific time window. The **Export** button next to it lets you download the entire dashboard as a PDF or HTML report.
+
+## Headline metrics
+
+Six animated stat cards across the top of the dashboard show totals for the entire dataset (or the selected date range):
+
+<CardGroup cols={3}>
+  <Card title="Total Devices" icon="computer-desktop">
+    The number of distinct infected devices in the database.
+  </Card>
+  <Card title="Total Credentials" icon="key">
+    The total count of credential records across all devices and all uploads.
+  </Card>
+  <Card title="Files Extracted" icon="document-duplicate">
+    The total number of files extracted from all stealer archives.
+  </Card>
+  <Card title="Total Domains" icon="globe-alt">
+    The number of unique domains found across all credential URLs.
+  </Card>
+  <Card title="Total URLs" icon="link">
+    The total count of unique URLs (including IPs) across all credentials.
+  </Card>
+</CardGroup>
+
+## Top 5 most used passwords
+
+A card below the headline metrics lists the five most common passwords found across all uploaded logs, ranked by occurrence count. Each entry shows the password value and the number of times it appears. This panel is intentionally concise — it is designed to surface the most dangerous reused passwords at a glance, not to replace a full password analysis.
+
+## Top 10 TLDs
+
+A scrollable list on the left side of the page ranks the 10 top-level domains (TLDs) with the most credential URLs. Each entry shows the TLD (e.g. `.com`, `.net`, `.id`) and the number of domains using it. This quickly reveals geographic or sector patterns in the exposed data.
+
+## Country heatmap
+
+A full-width world map visualises the geographic distribution of compromised devices by country. Countries with higher device counts appear darker. Hover over any country to see the exact count. This is powered by the `country` field extracted from each device's system information.
+
+<Info>
+  Country data is derived from the IP address recorded by the stealer at the time of infection. Devices without a detected country are excluded from the heatmap.
+</Info>
+
+## Top 10 browsers used by infected devices
+
+A vertical bar chart shows which browsers were most commonly installed on compromised machines. Browser data is extracted per-credential from the stealer log structure. Chrome, Edge, Firefox, and family-specific browsers like Opera GX each appear as separate bars.
+
+## Most common software found in logs
+
+An animated, ranked list shows the 10 most commonly detected software packages across all device software lists. Each entry shows the software name, version, and the number of devices on which it appeared. This is useful for spotting vulnerable software versions that are widespread across the compromised population.
+
+## Using date range filters
+
+Click the date picker at the top of the dashboard to filter all metrics to a specific range. Presets include **last 7 days**, **last 30 days**, **last 90 days**, and **custom range**. All six stat cards, the password ranking, TLD chart, browser chart, software list, and country heatmap update simultaneously when you apply a filter.
+
+<Tip>
+  After uploading a new batch of logs, use the date filter to scope the dashboard to today or this week and immediately assess the new data in isolation.
+</Tip>

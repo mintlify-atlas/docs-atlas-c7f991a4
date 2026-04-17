@@ -1,97 +1,65 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Broń Vault: Open-Source Stealer Log Analysis"
+description: "Broń Vault automatically parses stealer log ZIP files and presents credentials, device intelligence, and domain insights through a searchable dashboard."
 ---
 
-## Setting up
+Broń Vault is an open-source stealer logs parser and visualization dashboard built for security analysts. Drop a `.zip` log file into the web interface and the application automatically structures its contents — credentials, host information, software inventory, and files — ready for immediate inspection and cross-log correlation.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get Broń Vault running locally with Docker in under five minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Understand the MySQL + ClickHouse data pipeline powering fast analytics
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Automate uploads and searches with the REST API v1
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Domain Monitoring" icon="bell" href="/features/domain-monitoring">
+    Watch domains and receive webhook alerts when new logs match
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Get started in minutes
 
-Everything you need to create world-class documentation.
+<Steps>
+  <Step title="Clone and configure">
+    Clone the repository and copy `.env.example` to `.env`, setting secure passwords for MySQL, ClickHouse, and your JWT secret.
+  </Step>
+  <Step title="Start all services">
+    Run `bash docker-start.sh` to bring up MySQL, ClickHouse, MinIO, and the Next.js application with a single command.
+  </Step>
+  <Step title="Log in">
+    Open `http://localhost:3000` and sign in with the default admin credentials. Change the password immediately after first login.
+  </Step>
+  <Step title="Upload your first log">
+    Navigate to **Upload**, drag and drop a stealer log `.zip` file, and watch real-time progress as the parser structures the data.
+  </Step>
+</Steps>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Core features
 
-## Need inspiration?
+<CardGroup cols={2}>
+  <Card title="Credential Search" icon="magnifying-glass" href="/features/credential-search">
+    Search by email, domain, or username with Boolean AND/OR/NOT operators across all uploaded logs
+  </Card>
+  <Card title="Device Detail View" icon="desktop" href="/features/device-detail">
+    Explore per-device credentials, installed software, host information, and a full file tree
+  </Card>
+  <Card title="Domain Discovery" icon="globe" href="/features/domain-discovery">
+    Discover subdomains, paths, and exposed credentials for any domain across your dataset
+  </Card>
+  <Card title="Statistical Dashboard" icon="chart-bar" href="/features/dashboard">
+    Country heatmap, top TLDs, browser distribution, and credential volume at a glance
+  </Card>
+  <Card title="S3-Compatible Storage" icon="cloud" href="/configuration/storage">
+    Store uploaded files in AWS S3, MinIO, or any S3-compatible service
+  </Card>
+  <Card title="Roles & Access Control" icon="shield-halved" href="/configuration/users-and-roles">
+    Admin and Analyst roles with separate permission boundaries
+  </Card>
+</CardGroup>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Warning>
+  Broń Vault is intended for use in secure, isolated environments only. Do **not** expose it to public networks or deploy it in production. See the [Important Notice](https://github.com/ITSEC-Research/bron-vault#important-notice) in the repository for full details.
+</Warning>

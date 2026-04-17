@@ -1,0 +1,104 @@
+---
+title: "Device Detail View: Explore a Compromised Machine"
+description: "Dig into every artefact from a single infected device across five tabs: overview charts, host information, credentials, software, and the full file tree."
+---
+
+The device detail view consolidates everything Broń Vault knows about a single compromised machine into one place. It is reachable from any credential search result, from domain discovery results, and from domain monitoring alerts. The page is organised into five tabs, each surfacing a different category of extracted data.
+
+## Overview tab
+
+The Overview tab gives you an at-a-glance summary of the device before you dig into the raw data.
+
+<CardGroup cols={2}>
+  <Card title="Summary cards" icon="chart-bar">
+    Three stat cards at the top show the total number of credentials, installed software entries, and extracted files found on this device.
+  </Card>
+  <Card title="Device info strip" icon="computer-desktop">
+    Key system facts pulled from the stealer log: operating system, CPU model, GPU model, and total RAM.
+  </Card>
+  <Card title="Top passwords — polar area chart" icon="chart-pie">
+    A polar area chart visualising the most-repeated passwords on this device. Useful for spotting password reuse patterns at a glance.
+  </Card>
+  <Card title="Top domains — horizontal bar chart" icon="globe">
+    A horizontal bar chart of the domains with the most credentials on this device. The longest bars indicate which services are most heavily represented in the leak.
+  </Card>
+</CardGroup>
+
+A **file size distribution** analysis is also shown, breaking down extracted files by size bucket to help identify unusual file types or large documents of interest.
+
+## Host Information tab
+
+The Host Information tab presents the raw system metadata extracted by the stealer. Because Broń Vault supports 20+ stealer families, the fields available vary by log type — the parser detects the family and maps whatever fields it finds to a common schema.
+
+Fields you may see include:
+
+| Field | Description |
+|---|---|
+| Computer name | Hostname of the infected machine |
+| IP address | External or LAN IP recorded by the stealer |
+| Username | Windows / macOS username |
+| HWID | Hardware identifier string |
+| Operating system | Full OS version string |
+| Antivirus | Detected AV products on the machine |
+| Log date / time | When the stealer ran and captured the data |
+| Country | Geographic location derived from IP |
+| CPU | Processor model and core count |
+| GPU | Graphics card model |
+| RAM | Total installed memory |
+
+<Note>
+  Not every field is populated for every stealer family. Fields that could not be extracted are shown as empty rather than omitted, so you always know what was checked.
+</Note>
+
+## User Credentials tab
+
+The User Credentials tab lists every credential stored in Broń Vault for this device. Each row shows:
+
+- **URL** — the full target URL
+- **Username** — the account login (email or username)
+- **Password** — masked by default; click the eye icon to reveal
+- **Browser** — the browser the stealer extracted the credential from
+
+The table is searchable and sortable. You can also export the credential list from this tab.
+
+## Software Installed tab
+
+The Software Installed tab lists every application detected on the device from the stealer's software enumeration output. Each row includes:
+
+- **Software name**
+- **Version**
+
+This is useful for identifying vulnerable software versions, security tools (or their absence), and the general profile of the machine.
+
+## Files tab
+
+The Files tab renders the full file tree extracted from the device's stealer log. You can browse folders and open individual files directly in the browser.
+
+<CardGroup cols={2}>
+  <Card title="Tree viewer" icon="folder-tree">
+    A collapsible tree of all folders and files extracted from the archive for this device.
+  </Card>
+  <Card title="Inline content viewer" icon="document-text">
+    Click any text file (`.txt`, `.log`, `.json`, `.xml`, `.ini`, `.csv`, and more) to open its contents in an inline viewer without leaving the page.
+  </Card>
+  <Card title="Image viewer" icon="photo">
+    Screenshot files (`.jpg`, `.png`, `.webp`, etc.) open in an inline image viewer.
+  </Card>
+  <Card title="Download all" icon="arrow-down-tray">
+    Use the **Download All Data** button in the page header to download a ZIP of all text and binary files associated with this device.
+  </Card>
+</CardGroup>
+
+<Tip>
+  The **Generate Report** button in the header exports a self-contained HTML report of the device, suitable for sharing with teammates or attaching to a ticket.
+</Tip>
+
+## Navigating between tabs
+
+All five tabs share the same device context. Switch between them freely — the device ID stays in the URL so you can bookmark or share a direct link to any tab:
+
+```
+/device/{deviceId}
+```
+
+To return to search results, use the **Back to Search** button in the top-left corner.

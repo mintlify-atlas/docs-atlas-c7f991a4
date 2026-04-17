@@ -1,0 +1,123 @@
+---
+title: "Authenticating API requests with API keys in Broń Vault"
+description: "How to create API keys in Settings, pass them in the Authorization header, understand admin vs analyst roles, and handle 401, 403, and 429 responses."
+---
+
+Broń Vault uses API keys to authenticate all `/api/v1` requests. Keys are self-managed: you create them in the application under **Settings → API Keys**, assign a role, and optionally configure a rate limit and expiry date. The full key is shown only once at creation time, so copy it immediately and store it securely.
+
+<Warning>
+  API keys grant programmatic access to sensitive credential data. Treat them like passwords: never commit them to source control, and rotate them regularly.
+</Warning>
+
+## Roles
+
+Each API key is assigned one of two roles that determine which endpoints it can call:
+
+| Role | Capabilities |
+|------|-------------|
+| `admin` | Upload archives, search credentials, search domains, look up emails/domains, view device detail, view summary statistics |
+| `analyst` | Search credentials, search domains, look up emails/domains, view device detail, view summary statistics (cannot upload) |
+
+<Info>
+  Upload endpoints (`POST /api/v1/upload`) require an **admin** key. Analyst keys receive a `403` if they attempt to upload.
+</Info>
+
+## Key properties
+
+When you create a key in **Settings → API Keys**, you configure:
+
+- **Name** — A label to identify the key (max 255 characters).
+- **Role** — `admin` or `analyst`. Only application administrators can create admin-role keys.
+- **Rate limit** — Maximum requests allowed per window (default: 100; max: 10,000).
+- **Rate limit window** — Window duration in seconds (default: 60; max: 3,600).
+- **Expiry date** — Optional. After this date the key stops working automatically.
+
+## Sending requests
+
+Include your API key in the `Authorization` header as a Bearer token on every request:
+
+```
+Authorization: Bearer bv_<your-api-key>
+```
+
+All Broń Vault API keys begin with the prefix `bv_`.
+
+<CodeGroup>
+
+```bash curl
+curl --request POST \
+  --url http://localhost:3000/api/v1/search/credentials \
+  --header "Authorization: Bearer bv_YourApiKeyHere" \
+  --header "Content-Type: application/json" \
+  --data '{"query": "example@example.com", "type": "email"}'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "http://localhost:3000/api/v1/search/credentials",
+    headers={"Authorization": "Bearer bv_YourApiKeyHere"},
+    json={"query": "example@example.com", "type": "email"},
+)
+print(response.json())
+```
+
+</CodeGroup>
+
+## Rate limit headers
+
+Every response includes headers that show your current usage against the key's configured limit:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Requests allowed per window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the current window resets |
+
+## Error responses
+
+### 401 — Unauthorized
+
+Returned when the API key is missing, invalid, expired, or inactive.
+
+```json
+{
+  "success": false,
+  "error": "Invalid or missing API key",
+  "code": "INVALID_API_KEY"
+}
+```
+
+Common causes:
+- The `Authorization` header is absent.
+- The key does not start with `bv_`.
+- The key has been revoked or deleted.
+- The key's expiry date has passed.
+
+### 403 — Forbidden
+
+Returned when the key is valid but its role is insufficient for the requested endpoint.
+
+```json
+{
+  "success": false,
+  "error": "Admin API key required for this endpoint",
+  "code": "INSUFFICIENT_PERMISSIONS"
+}
+```
+
+### 429 — Rate limit exceeded
+
+Returned when you exceed the key's configured request limit within the current window.
+
+```json
+{
+  "success": false,
+  "error": "Rate limit exceeded",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "retryAfter": 42
+}
+```
+
+The `retryAfter` field contains the number of seconds until the window resets. The response also includes a `Retry-After` header with the same value.

@@ -1,0 +1,151 @@
+---
+title: "Domain Monitoring: Get Alerted on New Matching Uploads"
+description: "Watch domains of interest and receive webhook alerts with full device and credential details whenever a new upload contains matching data."
+---
+
+Domain Monitoring lets you define a set of domains to watch. After each upload completes, Broń Vault checks all newly ingested credentials against every active monitor and fires a webhook alert for every device that contains a match. Your team receives the alert — complete with device details and matched credentials — before anyone has to open the UI.
+
+## How it works
+
+Monitoring runs as a batch check at the end of each upload, after all devices have been parsed and stored. This keeps upload performance fast: the check runs once per batch rather than once per device.
+
+The check logic:
+
+1. Collect all active monitors and the domains they watch.
+2. Query credentials in the just-uploaded batch where the email domain or URL domain matches a monitored domain.
+3. For each match, build a webhook payload containing device info, matched credentials, and a summary.
+4. Deliver the payload to every active webhook linked to that monitor.
+5. Record the alert in the alert history with HTTP status and any errors.
+
+## Creating a monitor
+
+Navigate to **Domain Monitoring** in the sidebar and click **Add Monitor**.
+
+<Steps>
+  <Step title="Name the monitor">
+    Give the monitor a descriptive name, e.g. `Banking Partners` or `Corporate SSO`. The name appears in webhook payloads and alert history.
+  </Step>
+  <Step title="Add domains">
+    Enter one or more domains, one per line or comma-separated. Subdomains are matched automatically — adding `example.com` will match `login.example.com`, `api.example.com`, and any deeper subdomain.
+
+    ```
+    example.com
+    bank.co.id
+    mail.example.org
+    ```
+  </Step>
+  <Step title="Choose a match mode">
+    Select how credentials are matched against your domains:
+
+    | Mode | What it checks |
+    |---|---|
+    | **Both (Email + URL)** | Credentials where the login email uses the domain **or** the target URL points to the domain |
+    | **Email / Credential Only** | Only credentials where the login email's domain matches |
+    | **URL Only** | Only credentials where the target URL's domain matches |
+  </Step>
+  <Step title="Link webhooks">
+    Select one or more active webhooks to receive alerts for this monitor. You must create at least one webhook before you can link it. A single webhook can be shared across multiple monitors.
+  </Step>
+  <Step title="Save and activate">
+    Click **Create Monitor**. New monitors are active by default. Use the toggle switch on the monitor card to pause or resume it at any time.
+  </Step>
+</Steps>
+
+## Creating a webhook
+
+Navigate to the **Webhooks** tab in Domain Monitoring and click **Add Webhook**.
+
+<Steps>
+  <Step title="Name and URL">
+    Give the webhook a name (e.g. `Security Team Slack`) and provide the destination URL. Any HTTP/HTTPS endpoint that accepts POST requests works — Slack incoming webhooks, custom API endpoints, SIEM integrations, etc.
+  </Step>
+  <Step title="HMAC secret (optional)">
+    If you want to verify that payloads are genuinely from Broń Vault, enter an HMAC secret. Every request will include an `X-Webhook-Signature` header containing `sha256=<hmac-sha256-hex>` computed over the raw JSON body. Your endpoint can verify the signature before processing the payload.
+
+    ```
+    X-Webhook-Signature: sha256=a3f9c2...
+    ```
+  </Step>
+  <Step title="Custom headers (optional)">
+    Add any custom headers as a JSON object. Use this for authentication tokens, content-type overrides, or routing headers required by your endpoint:
+
+    ```json
+    {
+      "Authorization": "Bearer your-api-token",
+      "X-Source": "bronvault"
+    }
+    ```
+  </Step>
+  <Step title="Test the webhook">
+    Click the **Send** icon next to any webhook in the table to fire a test payload. The test payload contains sample device and credential data so you can verify your endpoint receives and processes it correctly before any real match occurs.
+  </Step>
+</Steps>
+
+## Webhook payload structure
+
+When a monitor fires, Broń Vault sends a JSON `POST` request to each linked webhook. The payload structure is:
+
+```json
+{
+  "monitor_name": "Banking Partners",
+  "matched_domain": "example.com",
+  "device": {
+    "target_machine_name": "DESKTOP-ABC123",
+    "target_ip": "203.0.113.5",
+    "username": "john.doe",
+    "hwid": "HWID-...",
+    "country": "ID",
+    "os": "Windows 10 Pro",
+    "log_date": "2025-03-14"
+  },
+  "credential_matches": [
+    {
+      "found_at": "2025-03-14T08:00:00.000Z",
+      "url": "https://login.example.com/auth",
+      "login": "alice@example.com",
+      "password": "hunter2",
+      "browser": "Chrome"
+    }
+  ],
+  "url_matches": [],
+  "summary": {
+    "total_credential_matches": 1,
+    "total_url_matches": 0,
+    "upload_batch": "batch_20250314_abc123"
+  }
+}
+```
+
+`credential_matches` contains entries where the login email matches the domain. `url_matches` contains entries where the credential URL targets the domain (deduplicated against `credential_matches`).
+
+## Match types
+
+Each alert record carries a `match_type` field indicating what kind of match triggered it:
+
+| Value | Meaning |
+|---|---|
+| `credential_email` | Only email-domain matches were found |
+| `url` | Only URL-domain matches were found |
+| `both` | Both email-domain and URL-domain matches were found |
+
+## Alert history
+
+The **Alert History** tab shows every webhook delivery attempt, filterable by status:
+
+<CardGroup cols={3}>
+  <Card title="Success" icon="check-circle">
+    Webhook responded with a 2xx HTTP status. The HTTP status code is shown.
+  </Card>
+  <Card title="Failed" icon="x-circle">
+    Webhook returned a non-2xx status or the connection timed out. The HTTP status or error message is shown.
+  </Card>
+  <Card title="Retrying" icon="arrow-path">
+    5xx errors and network failures are retried up to 3 times with exponential back-off (1 s, 2 s, 4 s).
+  </Card>
+</CardGroup>
+
+Each alert row shows the time, monitor name, matched domain, match type, credential and URL hit counts, webhook name, and delivery status. Click the eye icon to inspect the full JSON payload that was sent.
+
+<Warning>
+  Only users with the **Admin** role can create, edit, or delete monitors and webhooks. Analysts can view the monitoring page and alert history but cannot make changes.
+</Warning>

@@ -1,0 +1,93 @@
+---
+title: "Uploading and parsing stealer log ZIP archives"
+description: "Learn how to upload .zip stealer log files via the drag-and-drop web UI, what happens during processing, and how to review past imports."
+---
+
+Broń Vault turns raw stealer log archives into structured, queryable data with a single drag-and-drop. Drop a `.zip` file onto the upload page and the system automatically extracts every device directory inside it, detects the stealer family, parses credentials and system information, saves everything to MySQL, and synchronises it to ClickHouse — no scripting required.
+
+## Supported formats
+
+Broń Vault detects the stealer family from the content and structure of each device folder. The following families are recognised automatically:
+
+<CardGroup cols={3}>
+  <Card title="Generic / Unknown" icon="file">
+    Falls back to a generic parser when no signature matches.
+  </Card>
+  <Card title="Lumma, ExelaStealer, Astris" icon="shield-exclamation">
+    Well-known commodity stealers parsed natively.
+  </Card>
+  <Card title="Blank Grabber, Atomic Mac" icon="apple">
+    Includes macOS ZIP layout support for Atomic-family logs.
+  </Card>
+  <Card title="CryptBot, DarkCrystal RAT, Meduza" icon="skull">
+    Phase-3 priority parsers for common crimeware families.
+  </Card>
+  <Card title="RedLine/META, Rhadamanthys, RisePro" icon="bolt">
+    High-volume families with dedicated field parsers.
+  </Card>
+  <Card title="StealC, Vidar, Raccoon, Banshee, and more" icon="bug">
+    20+ families across six parsing phases in total.
+  </Card>
+</CardGroup>
+
+<Note>
+  If a device folder does not match any known signature, the generic parser extracts what it can. Fields that cannot be parsed are stored as empty.
+</Note>
+
+## Uploading a file
+
+<Steps>
+  <Step title="Open the Upload page">
+    Navigate to **Upload** in the sidebar. Only users with the **Admin** role can upload files. Analysts see an access-denied message and cannot reach this page.
+  </Step>
+  <Step title="Choose a streaming preference">
+    Before selecting a file, toggle **Show Stream Data During Upload** to control whether real-time parsing logs are displayed. You can also manage this in **User Settings → Preferences**. Disabling it can improve browser performance for very large archives.
+  </Step>
+  <Step title="Select or drop your .zip file">
+    Drag your `.zip` archive onto the drop zone, or click **Select File** to open the file picker. Only `.zip` files are accepted. If the file exceeds the configured size limit you will see an error — adjust the limit in **Settings** or use a smaller archive.
+  </Step>
+  <Step title="Monitor upload progress">
+    Files under 100 MB are sent in a single request. Files 100 MB and above are split into chunks and uploaded concurrently (chunk size and concurrency are configurable in Settings). A progress bar shows percentage complete. You can cancel at any time with the **Cancel** button.
+  </Step>
+  <Step title="Watch processing logs">
+    Once the file lands on the server, the status transitions to **Processing**. With streaming enabled, a live log panel shows each step: ZIP loading, device detection, credential parsing, binary file extraction, domain monitor checks, and MySQL/ClickHouse writes.
+  </Step>
+  <Step title="Review the results summary">
+    On success, a results card shows: devices found, devices processed, devices skipped (duplicates), files extracted, credentials found, binary files saved, unique domains, total URLs, and the upload batch ID. Duplicate devices — identified by a SHA-256 hash of the device name — are listed separately so you know exactly what was skipped.
+  </Step>
+</Steps>
+
+## What happens during processing
+
+When the server receives the archive, the following pipeline runs in order:
+
+```
+ZIP extraction
+  └─ Device detection (group files by top-level folder name)
+       └─ Duplicate check (SHA-256 hash against existing devices)
+            └─ For each new device:
+                 ├─ System information parsing (OS, CPU, GPU, RAM, IP, HWID, AV, log date)
+                 ├─ Credential parsing (URL, username, password, browser, domain)
+                 ├─ Software list parsing
+                 ├─ Binary file extraction → local storage or S3
+                 └─ MySQL INSERT (credentials, files, software, systeminformation)
+  └─ ClickHouse sync via MaterializedMySQL (automatic, real-time)
+  └─ Domain monitor batch check (runs once after all devices are processed)
+  └─ Analytics cache invalidation
+```
+
+<Info>
+  Domain monitors are checked **once per upload batch**, after all devices are processed, rather than per-device. This keeps parsing fast for large archives.
+</Info>
+
+## File size limits
+
+The maximum upload size is configurable per deployment. The default is **10 GB**. Chunk size and maximum concurrent chunks can also be adjusted. To change these values, go to **Settings → Upload**.
+
+<Warning>
+  Broń Vault loads ZIP files entirely into memory for parsing. Very large archives may exceed available heap space. If you see an out-of-memory error, split the archive into smaller batches before uploading.
+</Warning>
+
+## Reviewing past imports
+
+After uploading, navigate to **Import Logs** in the sidebar to see a full history of every import job. The table shows the filename, file size, upload source (web UI or API), status, total devices processed, credentials found, files extracted, and timestamps for when the job started and completed. You can filter by status and search by filename.

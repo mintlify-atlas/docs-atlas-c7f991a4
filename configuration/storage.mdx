@@ -1,0 +1,122 @@
+---
+title: 'Configuring file storage: local and S3-compatible'
+description: 'Set up local filesystem or S3-compatible object storage in Broń Vault, including MinIO, AWS S3, and one-click migration between backends.'
+---
+
+Broń Vault stores the extracted files from uploaded stealer log archives in a configurable storage backend. Out of the box it writes files to a local `./uploads` directory on the server. For deployments where persistent local storage is impractical, or where you want to keep files separate from the application host, you can switch to any S3-compatible object storage service. The switch happens entirely through the UI — no code changes or restarts are required.
+
+## Default local storage
+
+When no storage configuration has been changed, Broń Vault writes all extracted files to the `uploads/` directory inside the application folder. In the Docker Compose setup this directory is bind-mounted from the host:
+
+```yaml
+volumes:
+  - ./uploads:/app/uploads
+```
+
+Files persist across container restarts as long as the host directory exists. No additional configuration is needed to use local storage.
+
+<Note>
+  Local storage is the default and requires no configuration. If you are running Broń Vault in Docker and only need storage on the same machine, you do not need to read further.
+</Note>
+
+## S3-compatible object storage
+
+Broń Vault supports any S3-compatible service as a storage backend:
+
+<CardGroup cols={3}>
+  <Card title="AWS S3" icon="cloud">
+    Amazon's managed object storage. Use the standard `https://s3.amazonaws.com` endpoint.
+  </Card>
+  <Card title="MinIO" icon="server">
+    Self-hosted S3-compatible storage. A MinIO instance is bundled in the Docker Compose setup.
+  </Card>
+  <Card title="Any S3-compatible service" icon="database">
+    Backblaze B2, Cloudflare R2, DigitalOcean Spaces, and others that implement the S3 API.
+  </Card>
+</CardGroup>
+
+### Configuring storage in the UI
+
+Storage is configured through **Settings → Storage** in the Broń Vault interface. Only admin accounts can access this page.
+
+<Steps>
+  <Step title="Open Settings → Storage">
+    Navigate to **Settings** in the sidebar and select the **Storage** tab.
+  </Step>
+  <Step title="Fill in the S3 configuration fields">
+    Enter the connection details for your storage provider. See the field reference below.
+  </Step>
+  <Step title="Save the configuration">
+    Click **Save Changes**. The credentials are stored in the database; no environment variable changes are needed.
+  </Step>
+  <Step title="Test the connection">
+    Click **Test Connection**. Broń Vault will attempt to reach the endpoint, verify bucket access, and perform a read/write/delete check. A success message confirms the configuration is valid.
+  </Step>
+  <Step title="Migrate existing files (optional)">
+    If you have existing files stored locally and want to move them to S3, use the **Migrate to S3** button. See the migration section below for details.
+  </Step>
+</Steps>
+
+### Configuration fields
+
+| Field | Description | Example |
+|---|---|---|
+| **Endpoint URL** | Full URL to the S3 API, including protocol and port. | `http://localhost:9001` (MinIO) or `https://s3.amazonaws.com` (AWS) |
+| **Region** | AWS region, or any string for non-AWS providers. | `us-east-1` |
+| **Bucket name** | Name of the bucket to store files in. Broń Vault will attempt to create it if it does not exist. | `bron-vault-storage` |
+| **Access key** | Access key ID for authenticating with the storage service. | — |
+| **Secret key** | Secret access key paired with the access key. | — |
+
+<Tip>
+  For MinIO and other self-hosted services, **path-style addressing** must be enabled (this is on by default in the UI). AWS S3 typically uses virtual-hosted–style addressing.
+</Tip>
+
+## MinIO in the Docker Compose setup
+
+The Docker Compose file includes a MinIO service that is ready to use without any external accounts. After starting the stack, MinIO is available at:
+
+| Service | URL |
+|---|---|
+| **S3 API** (used by Broń Vault) | `http://localhost:9001` |
+| **MinIO Console** (web UI) | `http://localhost:9002` |
+
+Log in to the console with `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` from your `.env` file (defaults: `minioadmin` / `minioadmin`).
+
+To point Broń Vault at the bundled MinIO instance, use these values in **Settings → Storage**:
+
+```
+Endpoint URL:  http://minio:9000        (from inside Docker, using the service hostname)
+               http://localhost:9001    (from the host machine or dev mode)
+Region:        us-east-1
+Bucket name:   bron-vault-storage      (or any name you choose)
+Access key:    minioadmin              (your MINIO_ROOT_USER value)
+Secret key:    minioadmin              (your MINIO_ROOT_PASSWORD value)
+```
+
+<Warning>
+  Change the default MinIO credentials in `.env` before exposing the service on a network. The defaults (`minioadmin` / `minioadmin`) are well-known and must not be used in any environment accessible to other users.
+</Warning>
+
+## Migrating local files to S3
+
+If you have already uploaded files while using local storage and want to move them to S3, Broń Vault includes a one-click migration tool in **Settings → Storage**.
+
+<Steps>
+  <Step title="Save and test your S3 configuration">
+    Complete the S3 setup and confirm the connection test passes before starting a migration.
+  </Step>
+  <Step title="Click Migrate to S3">
+    A confirmation dialog will appear summarising what will happen. Click **Start Migration** to proceed.
+  </Step>
+  <Step title="Monitor progress">
+    The UI displays real-time progress including files migrated, bytes transferred, current speed, and estimated time remaining. A live log stream shows per-file status.
+  </Step>
+  <Step title="Review the result">
+    When migration completes successfully, the storage backend switches automatically to S3 and local files are cleaned up. If any files fail, the storage type is not changed — review the error log, fix the underlying issue, and retry.
+  </Step>
+</Steps>
+
+<Note>
+  Migration runs in the background on the server. You can navigate away from the Settings page and return to check progress. The migration can be aborted at any time using the **Abort** button; aborting does not switch the storage backend.
+</Note>

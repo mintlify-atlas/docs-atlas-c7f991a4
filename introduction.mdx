@@ -1,0 +1,51 @@
+---
+title: "What is Broń Vault? Features, use cases, and security note"
+description: "Broń Vault replaces manual log parsing with a drag-and-drop dashboard for credential search, device intelligence, and domain discovery. Isolated lab use only."
+---
+
+Broń Vault is an open-source stealer log analysis platform built for security analysts who need to process large volumes of `.zip` log files without writing ad-hoc scripts. Upload a log archive through the web interface and the application automatically parses it into a structured, searchable dataset — credentials, host metadata, installed software, browser data, and raw files — all correlated by device and ready for inspection within seconds.
+
+<Warning>
+  Broń Vault was developed as a research side project. It is **not** hardened for production use. Deploy it exclusively in a secure, isolated environment and never expose it to public networks. See the [Important Notice](https://github.com/ITSEC-Research/bron-vault#important-notice) in the repository for full details.
+</Warning>
+
+## Who it's for
+
+Broń Vault is designed for security teams and researchers who regularly handle stealer log data as part of threat intelligence, incident response, or defensive research workflows. It removes the friction of one-off parsing scripts by providing a consistent interface and a queryable data store that grows with every upload.
+
+## The problem it solves
+
+Stealer log archives arrive in inconsistent formats across dozens of malware families. Analysts typically rely on custom scripts that must be maintained, run locally, and produce output that is difficult to share or query across datasets. Broń Vault standardises this process: a single upload pipeline handles format detection, credential extraction, and system information parsing, then stores everything in a relational database backed by a columnar analytics engine for fast cross-log search.
+
+## Key capabilities
+
+- **File upload and parsing** — drag and drop `.zip` archives; real-time progress and detailed logs during processing
+- **Credential search** — find credentials by email, domain, or username with Boolean AND/OR/NOT operators across all uploaded logs
+- **Device detail view** — per-device overview with credentials, installed software, host information, and a full file tree
+- **Domain discovery** — subdomains, paths, and exposed credentials for any domain or keyword across your dataset
+- **Statistical dashboard** — country heatmap, top TLDs, browser distribution, and credential volume visualisations
+- **Domain monitoring** — define monitors and receive webhook alerts when new uploads match configured domains
+- **S3-compatible storage** — optionally store uploaded files in AWS S3, MinIO, or any S3-compatible service
+- **REST API v1** — programmatic access for search, lookup, and upload with API-key authentication
+- **Roles** — Admin and Analyst roles with separate permission boundaries
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get Broń Vault running with Docker in minutes
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    MySQL, ClickHouse, and how MaterializedMySQL replication works
+  </Card>
+  <Card title="Credential search" icon="magnifying-glass" href="/features/credential-search">
+    Boolean search across all uploaded logs
+  </Card>
+  <Card title="Device detail" icon="desktop" href="/features/device-detail">
+    Explore per-device intelligence in one view
+  </Card>
+  <Card title="Domain monitoring" icon="bell" href="/features/domain-monitoring">
+    Watch domains and receive webhook alerts
+  </Card>
+  <Card title="API reference" icon="code" href="/api/overview">
+    Automate uploads and searches with REST API v1
+  </Card>
+</CardGroup>

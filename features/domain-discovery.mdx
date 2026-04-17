@@ -1,0 +1,87 @@
+---
+title: "Domain Discovery: Map Your Attack Surface in Logs"
+description: "Enter a domain or keyword to find every subdomain, path, and credential exposed across all uploaded stealer logs, with deduplication and timeline visualisation."
+---
+
+Domain Discovery (also called Asset Discovery or Domain Recon) lets you query all uploaded stealer logs for anything related to a specific domain or keyword. Instead of searching for individual accounts, you search for an organisation's entire footprint — subdomains, login paths, and every credential found at any of those endpoints — in a single query.
+
+## Starting a search
+
+Navigate to **Domain Search** in the sidebar. Enter a domain name (e.g. `example.com`) or a free-form keyword (e.g. `mycompany`). You can also use the same Boolean operators supported in credential search:
+
+```
+example.com, test.com       → OR: results for either domain
+example.com + staging        → AND: results matching both terms
+example.com, -staging        → NOT: exclude staging references
+```
+
+Domain searches automatically match subdomains — querying `example.com` returns results for `login.example.com`, `api.example.com`, and any other subdomain present in the logs.
+
+After submitting, you land on the results page at `/domain-search/{domain}`. Results are split across three tabs.
+
+## Overview tab
+
+The Overview tab gives you a strategic summary of the domain's exposure across all uploaded logs.
+
+<CardGroup cols={2}>
+  <Card title="Timeline visualisation" icon="chart-line">
+    A chart showing when credentials for this domain were logged by stealers over time, based on the **log date** field extracted from each device. This reveals when victims were compromised, not just when you uploaded the data.
+  </Card>
+  <Card title="Top 10 most-used passwords" icon="key">
+    A ranked list of the 10 most common passwords found in credentials targeting this domain. Useful for assessing password hygiene and spotting shared passwords across accounts.
+  </Card>
+  <Card title="Top 10 subdomains by credential volume" icon="server">
+    A horizontal bar chart ranking the 10 subdomains with the most associated credentials. Reveals which parts of the domain's infrastructure are most represented in stealer logs.
+  </Card>
+  <Card title="Top 10 paths by credential volume" icon="folder-open">
+    A horizontal bar chart of the 10 URL paths (e.g. `/login`, `/auth`, `/admin`) with the most credentials. Useful for identifying which endpoints are most frequently targeted.
+  </Card>
+</CardGroup>
+
+Summary statistics at the top of the tab show totals across the entire result set:
+
+- Total unique subdomains found
+- Total unique paths found
+- Total credentials found
+- Total affected devices
+
+## Subdomains tab
+
+The Subdomains tab lists every subdomain discovered for the queried domain, along with its associated paths and credential counts.
+
+**Deduplication feature:** When the same subdomain appears with multiple paths, you can enable deduplication to collapse them into a single row with an aggregated credential count. This makes it easier to assess the overall exposure of a subdomain without being overwhelmed by path-level granularity.
+
+Each row shows:
+
+- **Subdomain** — the full hostname
+- **Path** — the URL path (or aggregated count when deduplicated)
+- **Credentials** — number of credentials found at this subdomain/path combination
+
+## Credentials tab
+
+The Credentials tab lists every individual credential associated with the queried domain across all uploaded logs. Each row shows:
+
+- **URL** — the full target URL
+- **Username** — the account login
+- **Password** — masked by default
+- **Log date** — when the stealer captured this credential on the victim's device
+- **Device link** — a direct link to the [Device Detail view](/features/device-detail) for the infected machine
+
+<Tip>
+  Click the device link in any row to pivot from a credential to the full compromised machine context — all other credentials, software, files, and host information from the same device.
+</Tip>
+
+## Keyword mode
+
+In addition to domain mode, Domain Discovery supports a **keyword** search mode. Instead of matching by domain structure, keyword mode searches the hostname or full URL for any occurrence of the keyword. Use this when you want to find all logs referencing a brand name, product, or internal identifier that appears across multiple domains.
+
+```
+mycompany        → matches login.mycompany.com, api.mycompany.io, sso.mycompany.net
+vpn              → matches vpn.corp.com, vpn.example.org, myvpn.acme.com
+```
+
+Select **Keyword** in the search type dropdown before submitting to activate this mode.
+
+<Note>
+  Domain Discovery queries run against ClickHouse, which means even large datasets return results quickly. The Overview tab aggregations (timeline, top passwords, top subdomains, top paths) are all computed server-side.
+</Note>

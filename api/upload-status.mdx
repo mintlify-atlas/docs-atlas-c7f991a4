@@ -1,0 +1,210 @@
+---
+title: "Upload Job Status — GET /api/v1/upload/status/{jobId}"
+description: "Poll the processing status of an upload job. Returns progress percentage, device and credential counts, timing, and optional processing logs."
+---
+
+After submitting an archive via [POST /api/v1/upload](/api/upload), use this endpoint to track its processing lifecycle. The response includes a progress percentage, running device and credential counts, and timing information. When a job fails, an error object with the failure message and code is included.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/upload/status/{jobId}`
+- **Auth:** `admin` or `analyst` API key
+
+<Note>
+  Analyst keys can only retrieve status for jobs they own. Admin keys can retrieve status for any job, regardless of who submitted it.
+</Note>
+
+## Path parameters
+
+<ParamField path="jobId" type="string" required>
+  The job ID returned by `POST /api/v1/upload` in the `data.jobId` field.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="logs" type="string" default="false">
+  Set to `true` to include up to 100 processing log entries in the response. Each entry has a `level`, `message`, `timestamp`, and optional `metadata` object.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` on a successful response.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties" defaultOpen>
+    <ResponseField name="jobId" type="string">
+      The job identifier.
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Current job status. One of: `pending`, `processing`, `completed`, `failed`, `cancelled`.
+    </ResponseField>
+
+    <ResponseField name="progress" type="number">
+      Processing progress from `0` to `100`. Reaches `100` only when the job completes successfully.
+    </ResponseField>
+
+    <ResponseField name="filename" type="string">
+      Original filename of the uploaded archive.
+    </ResponseField>
+
+    <ResponseField name="fileSize" type="number">
+      File size in bytes.
+    </ResponseField>
+
+    <ResponseField name="stats" type="object">
+      Running and final processing counts.
+      <Expandable title="stats properties">
+        <ResponseField name="totalDevices" type="number">
+          Total number of device directories identified in the archive.
+        </ResponseField>
+        <ResponseField name="processedDevices" type="number">
+          Number of device directories fully processed so far.
+        </ResponseField>
+        <ResponseField name="totalCredentials" type="number">
+          Total credential records extracted and stored.
+        </ResponseField>
+        <ResponseField name="totalFiles" type="number">
+          Total file entries extracted and stored.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="timing" type="object">
+      Job lifecycle timestamps.
+      <Expandable title="timing properties">
+        <ResponseField name="createdAt" type="string">ISO 8601 timestamp when the job was created.</ResponseField>
+        <ResponseField name="startedAt" type="string">ISO 8601 timestamp when processing began. `null` if still queued.</ResponseField>
+        <ResponseField name="completedAt" type="string">ISO 8601 timestamp when processing ended. `null` if still running.</ResponseField>
+        <ResponseField name="processingTime" type="number">
+          Processing duration in milliseconds. `null` if the job has not completed yet.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="error" type="object">
+      Present only when `status` is `"failed"`.
+      <Expandable title="error properties">
+        <ResponseField name="message" type="string">Human-readable description of the failure.</ResponseField>
+        <ResponseField name="code" type="string">Machine-readable error code (e.g., `PROCESSING_FAILED`, `UNEXPECTED_ERROR`).</ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="logs" type="object[]">
+      Present only when the `logs=true` query parameter is set. Up to 100 entries.
+      <Expandable title="log entry properties">
+        <ResponseField name="level" type="string">Log level: `info`, `warning`, or `error`.</ResponseField>
+        <ResponseField name="message" type="string">Log message text.</ResponseField>
+        <ResponseField name="timestamp" type="string">ISO 8601 timestamp of the log entry.</ResponseField>
+        <ResponseField name="metadata" type="object">Optional structured data attached to the log entry.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Job status lifecycle
+
+Jobs progress through the following states:
+
+```
+pending → processing → completed
+                     ↘ failed
+                     ↘ cancelled
+```
+
+- **`pending`** — The job is queued; processing has not yet started. This happens when the upload concurrency limit is reached and another job must finish first.
+- **`processing`** — The archive is actively being parsed and loaded into the database.
+- **`completed`** — Processing finished successfully. Final device, credential, and file counts are available in `stats`.
+- **`failed`** — Processing encountered an unrecoverable error. The `error` object contains the failure details.
+- **`cancelled`** — The job was cancelled before completion.
+
+<Tip>
+  Poll every **5–10 seconds** during processing. The `progress` field updates as each device directory is processed, giving you a live percentage.
+</Tip>
+
+## Error responses
+
+| Code | HTTP | Description |
+|------|------|-------------|
+| `MISSING_JOB_ID` | 400 | No `jobId` in the path |
+| `JOB_NOT_FOUND` | 404 | No job matches the given ID |
+| `ACCESS_DENIED` | 403 | Analyst key requesting a job owned by another user |
+| `INVALID_API_KEY` | 401 | Key is missing or invalid |
+| `STATUS_ERROR` | 500 | Internal error fetching job data |
+
+## Examples
+
+<CodeGroup>
+
+```bash Check status
+curl --request GET \
+  --url "http://localhost:3000/api/v1/upload/status/550e8400-e29b-41d4-a716-446655440000" \
+  --header "Authorization: Bearer bv_YourApiKeyHere"
+```
+
+```bash Check status with logs
+curl --request GET \
+  --url "http://localhost:3000/api/v1/upload/status/550e8400-e29b-41d4-a716-446655440000?logs=true" \
+  --header "Authorization: Bearer bv_YourApiKeyHere"
+```
+
+</CodeGroup>
+
+### Completed job response
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "completed",
+    "progress": 100,
+    "filename": "stealer-logs.zip",
+    "fileSize": 104857600,
+    "stats": {
+      "totalDevices": 148,
+      "processedDevices": 148,
+      "totalCredentials": 92740,
+      "totalFiles": 18350
+    },
+    "timing": {
+      "createdAt": "2024-11-20T12:00:00.000Z",
+      "startedAt": "2024-11-20T12:00:03.201Z",
+      "completedAt": "2024-11-20T12:04:51.809Z",
+      "processingTime": 288608
+    }
+  }
+}
+```
+
+### Failed job response
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "550e8400-e29b-41d4-a716-446655440001",
+    "status": "failed",
+    "progress": 43,
+    "filename": "corrupted-archive.zip",
+    "fileSize": 52428800,
+    "stats": {
+      "totalDevices": 62,
+      "processedDevices": 27,
+      "totalCredentials": 14200,
+      "totalFiles": 3100
+    },
+    "timing": {
+      "createdAt": "2024-11-20T13:00:00.000Z",
+      "startedAt": "2024-11-20T13:00:02.100Z",
+      "completedAt": "2024-11-20T13:01:15.500Z",
+      "processingTime": 73400
+    },
+    "error": {
+      "message": "Failed to extract directory: unexpected end of archive",
+      "code": "PROCESSING_FAILED"
+    }
+  }
+}
+```

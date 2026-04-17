@@ -1,0 +1,84 @@
+---
+title: 'Environment variables reference for Broń Vault'
+description: 'A complete reference of every environment variable required to run Broń Vault, organized by service, with examples and security guidance.'
+---
+
+Before starting Broń Vault, copy `.env.example` to `.env` and fill in secure values for every variable listed below. The Docker Compose setup reads this file automatically and injects the values into each service container. None of these variables have safe defaults in production — leaving any password at its example value is a security risk.
+
+<Warning>
+  Change **all** default passwords before starting the stack. The example values in `.env.example` are placeholders only. Use a password manager or `openssl rand -hex 32` to generate strong, unique secrets for each variable.
+</Warning>
+
+## Authentication
+
+| Variable | Description | Example | Required |
+|---|---|---|---|
+| `JWT_SECRET` | Secret used to sign and verify user session tokens. Must be at least 32 characters and completely random. | `openssl rand -hex 32` output | Required |
+
+<Tip>
+  Generate a secure JWT secret with: `openssl rand -hex 32`
+</Tip>
+
+## MySQL database
+
+Broń Vault uses MySQL 8.0 as its primary database. The root password is for internal MySQL administration; the app user (`MYSQL_USER` / `MYSQL_PASSWORD`) is what the Next.js application actually uses to connect.
+
+| Variable | Description | Example | Required |
+|---|---|---|---|
+| `MYSQL_ROOT_PASSWORD` | Root password for the MySQL server. Used for initial setup and admin tasks. | `change_me_root_password_123` | Required |
+| `MYSQL_DATABASE` | Name of the database to create. You generally do not need to change this. | `bronvaultnew` | Required |
+| `MYSQL_USER` | Username the application uses to connect to MySQL. | `bronvault` | Required |
+| `MYSQL_PASSWORD` | Password for `MYSQL_USER`. Keep this different from the root password. | `change_me_app_password_123` | Required |
+
+## ClickHouse analytics
+
+ClickHouse is used for fast analytics queries and domain searches. It automatically replicates data from MySQL via MaterializedMySQL — no manual sync steps required.
+
+| Variable | Description | Example | Required |
+|---|---|---|---|
+| `CLICKHOUSE_USER` | Username the application uses to connect to ClickHouse. | `default` | Required |
+| `CLICKHOUSE_PASSWORD` | Password for `CLICKHOUSE_USER`. | `change_me_clickhouse_password_123` | Required |
+| `CLICKHOUSE_DB` | Name of the ClickHouse analytics database. | `bronvault_analytics` | Required |
+
+## Internal sync
+
+These credentials create the bridge account that lets ClickHouse replicate data from MySQL using MaterializedMySQL. You never log in with these credentials directly — they are used only for internal service-to-service communication.
+
+| Variable | Description | Example | Required |
+|---|---|---|---|
+| `SYNC_USER` | MySQL username created for ClickHouse replication. | `clickhouse_sync` | Required |
+| `SYNC_PASSWORD` | Password for `SYNC_USER`. Use a value different from `MYSQL_PASSWORD`. | `change_me_sync_password_123` | Required |
+
+<Note>
+  The setup container creates `SYNC_USER` automatically on first start. You do not need to create it manually.
+</Note>
+
+## Object storage (optional)
+
+MinIO is an S3-compatible object storage server included in the Docker Compose setup. It is optional — Broń Vault defaults to storing uploaded files on the local filesystem. If you plan to configure S3 storage, use these credentials to access the MinIO console and S3 API after startup.
+
+| Variable | Description | Example | Required |
+|---|---|---|---|
+| `MINIO_ROOT_USER` | Admin username for the MinIO server. | `minioadmin` | Optional |
+| `MINIO_ROOT_PASSWORD` | Admin password for the MinIO server. | `minioadmin` | Optional |
+
+Once running, MinIO is accessible at:
+
+- **S3 API**: `http://localhost:9001`
+- **Console (web UI)**: `http://localhost:9002`
+
+To connect Broń Vault to MinIO (or any S3-compatible service), configure the storage endpoint and credentials in **Settings → Storage** inside the application. See the [storage configuration guide](/configuration/storage) for full instructions.
+
+## Security checklist
+
+<AccordionGroup>
+  <Accordion title="Password requirements">
+    Use a minimum of 16 characters combining letters, numbers, and symbols. Every variable should have a unique value — never reuse the same password across `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD`, `SYNC_PASSWORD`, and `CLICKHOUSE_PASSWORD`.
+  </Accordion>
+  <Accordion title="Keeping .env out of version control">
+    The `.gitignore` already excludes `.env`. Never commit this file. Store it securely outside the repository, for example in a secrets manager or an encrypted vault.
+  </Accordion>
+  <Accordion title="Changing passwords after initial setup">
+    If you need to rotate passwords on a running stack, update the values in `.env`, then restart the affected services with `docker compose up -d`. The setup container only runs once; MySQL and ClickHouse user credentials are set at first boot.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,88 @@
+---
+title: "Debug-Zip: Inspect ZIP Structure Before Importing"
+description: "Use the Debug-Zip utility to analyse a stealer log ZIP file's internal structure, detect supported formats, and flag issues before committing to a full import."
+---
+
+The Debug-Zip utility lets you inspect the internal structure of a `.zip` file without writing anything to the database. It is useful for validating that a file matches a supported stealer log format, understanding how device directories are laid out inside the archive, and diagnosing why a particular file fails or produces unexpected results during a full import.
+
+## How to use it
+
+Navigate to **Debug-Zip** in the application sidebar. You will see a drag-and-drop upload area.
+
+Either drag a `.zip` file onto the dropzone, or click **Select File** to browse. The utility sends the file to the server-side analysis endpoint (`/api/debug-large-zip`) and returns a structured report. No data from the zip is stored anywhere — the file is read in memory and discarded after analysis.
+
+## What it checks
+
+The analysis runs in three main stages.
+
+### Structure detection
+
+The analyzer reads all file paths inside the zip and classifies the archive into one of three structure types:
+
+| Type | Description |
+|---|---|
+| `direct` | Device directories sit at the top level of the zip (more than 10 first-level directories after filtering). |
+| `pre-directory` | All device directories are nested inside a single parent folder (exactly one first-level directory after filtering). |
+| `nested` | The layout is ambiguous — between 2 and 10 first-level directories were found. |
+
+This classification controls how device names are extracted: in a `pre-directory` zip the device name comes from the second path segment; in a `direct` zip it comes from the first.
+
+### System file filtering
+
+Before classifying the structure, the analyzer strips known system and metadata entries so they do not skew the directory count or appear as phantom devices:
+
+- `__MACOSX` and `.DS_Store` — macOS archive metadata
+- `.Trashes`, `.fseventsd`, `.Spotlight-V100`, `.TemporaryItems` — macOS system directories
+- `Thumbs.db`, `System Volume Information` — Windows system files
+- Any entry whose name starts with `.`
+
+When a `__MACOSX` directory is present, the report notes that a macOS-generated ZIP was detected.
+
+### Per-device analysis
+
+For each device directory found, the analyzer counts:
+
+- **Total files** — all non-directory entries under the device folder
+- **Password files** — files whose path contains the word `password` (case-insensitive)
+- **Directories** — subdirectory entries under the device folder
+- **Sample paths** — the first five file paths, shown for manual inspection
+
+## Output report
+
+After analysis, the UI displays the following sections.
+
+**File overview** — file name, total size, total zip entries, total file count, and number of unique devices detected.
+
+**Potential issues** — a list of flagged conditions that may cause import problems:
+
+| Issue | What it means |
+|---|---|
+| Devices with no files | Empty device directories were found. |
+| Devices with no password files | Device folders do not contain any file with "password" in the path, which is unusual for stealer logs and may indicate the zip does not match a supported format. |
+| Devices with very long names (>100 chars) | Unusually long directory names that could cause parsing failures. |
+| Devices with special characters in names | Names containing `< > : " \| ? *` that may be rejected by the file system or parser. |
+
+**Sample device names** — the first 10 device names extracted from the archive, shown as badges for a quick sanity check.
+
+**Top 20 devices by file count** — a detailed list of the 20 most file-rich devices, each showing file count, password file count, and sample paths from inside the device folder.
+
+## When to use it
+
+<CardGroup cols={2}>
+  <Card title="Before a large import" icon="shield-check">
+    Run Debug-Zip on any unfamiliar archive to confirm the structure is recognised before queuing a full import job.
+  </Card>
+  <Card title="Troubleshooting parse failures" icon="bug">
+    If an upload completes but produces zero devices or credentials, Debug-Zip shows whether the structure type was detected correctly.
+  </Card>
+  <Card title="Validating password file presence" icon="key">
+    Check whether every device directory contains a password file. Missing password files are flagged as a potential issue in the report.
+  </Card>
+  <Card title="Inspecting macOS-created archives" icon="apple">
+    Zips created on macOS often include a `__MACOSX` metadata directory. Debug-Zip detects and filters it automatically and reports when this occurs.
+  </Card>
+</CardGroup>
+
+<Note>
+Debug-Zip requires an authenticated session. Unauthenticated requests to `/api/debug-large-zip` return HTTP 401.
+</Note>

@@ -1,0 +1,110 @@
+---
+title: "REST API v1: endpoints, auth, rate limits, and errors"
+description: "Base URL, available endpoints, authentication roles, rate limiting, response format, pagination, and common error codes for the Broń Vault API."
+---
+
+The Broń Vault REST API lets you search credentials, look up domains, upload stealer log archives, and track processing jobs—all from your own scripts and integrations. Every endpoint lives under `/api/v1` and returns JSON. Authentication is handled through API keys you create in **Settings → API Keys**; each key carries a role (`admin` or `analyst`) that controls which endpoints it may call.
+
+## Base URL
+
+```
+/api/v1
+```
+
+All paths in this reference are relative to the instance root. If you are running Broń Vault locally, the full base URL is `http://localhost:3000/api/v1`.
+
+## Endpoints
+
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/search/credentials` | admin, analyst | Search credentials by email, username, password, or any field |
+| `POST` | `/api/v1/search/domain` | admin, analyst | Search credentials by domain with optional subdomain matching |
+| `GET` | `/api/v1/lookup` | admin, analyst | Quick existence check for an email or domain |
+| `GET` | `/api/v1/device/{deviceId}` | admin, analyst | Retrieve device detail, host info, and optional include sets |
+| `GET` | `/api/v1/summary` | admin, analyst | Dashboard-level statistics, top TLDs, and country heatmap data |
+| `POST` | `/api/v1/upload` | admin only | Upload a `.zip` stealer log archive; always returns a job ID |
+| `GET` | `/api/v1/upload/status/{jobId}` | admin, analyst | Poll processing progress for an upload job |
+
+## Authentication
+
+Every request must include a valid API key. Pass the key in the `Authorization` header as a Bearer token:
+
+```
+Authorization: Bearer bv_<your-key>
+```
+
+See [Authentication](/api/authentication) for a full description of roles, key creation, and error responses.
+
+## Rate limiting
+
+Rate limits are enforced per API key, not per IP address. Each key has a configurable limit (`rate_limit` requests per `rate_limit_window` seconds). You set these values when creating a key in **Settings → API Keys**; the defaults are **100 requests per 60 seconds**.
+
+Every API response includes three headers that show your current usage:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the current window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+
+When you exceed the limit, the API returns `429 Too Many Requests` with a `Retry-After` header indicating how many seconds to wait.
+
+## Response format
+
+All responses are JSON objects with a top-level `success` boolean:
+
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+Error responses follow a consistent shape:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable message",
+  "code": "MACHINE_READABLE_CODE"
+}
+```
+
+## Common error codes
+
+| Code | HTTP status | Description |
+|------|------------|-------------|
+| `INVALID_API_KEY` | 401 | Key is missing, malformed, expired, or inactive |
+| `INSUFFICIENT_PERMISSIONS` | 403 | Key role does not permit this action |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests within the window |
+| `MISSING_FILE` | 400 | No file field found in the upload form |
+| `INVALID_FILE_TYPE` | 400 | Only `.zip` files are accepted |
+| `FILE_TOO_LARGE` | 400 | File exceeds the configured maximum size |
+| `SAVE_ERROR` | 500 | File could not be written to temporary storage |
+| `UPLOAD_ERROR` | 500 | Unexpected error during upload handling |
+| `INVALID_REQUEST` | 400 | Required body parameter is missing or malformed |
+| `QUERY_TOO_SHORT` | 400 | Search query is fewer than 3 characters |
+| `QUERY_TOO_LONG` | 400 | Search query exceeds 500 characters |
+| `DOMAIN_TOO_SHORT` | 400 | Domain is fewer than 3 characters |
+| `MISSING_JOB_ID` | 400 | No job ID provided in the path |
+| `JOB_NOT_FOUND` | 404 | No upload job matches the given ID |
+| `SEARCH_ERROR` | 500 | Internal error during search execution |
+| `STATUS_ERROR` | 500 | Internal error fetching upload status |
+
+## Pagination
+
+Endpoints that return lists of results support `page` and `limit` parameters. Paginated responses include a `pagination` object:
+
+```json
+{
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 214,
+    "totalPages": 5,
+    "hasMore": true
+  }
+}
+```
+
+The maximum `limit` is **100** on search endpoints. Pages are 1-indexed.

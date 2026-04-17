@@ -1,0 +1,116 @@
+---
+title: "Development Setup: Hot Reload with npm run dev"
+description: "Run Broń Vault in development mode with hot reload. Start only infrastructure in Docker, then run the Next.js app locally for instant code change feedback."
+---
+
+When working on the codebase, running the Next.js app inside Docker requires a full image rebuild on every change. The development workflow avoids this by starting only the backing infrastructure — MySQL, ClickHouse, MinIO, and the setup worker — inside Docker, while the Next.js app runs directly on your machine with `npm run dev`. Code changes are reflected in the browser immediately without rebuilding any images.
+
+## How it works
+
+`docker-start-infra.sh` (or the npm shorthand `npm run docker:infra`) starts four Docker services:
+
+- **MySQL 8.0** — primary application database
+- **ClickHouse 24.3** — analytics database with MaterializedMySQL replication
+- **MinIO** — S3-compatible object storage
+- **setup** — one-shot container that configures the replication user and ClickHouse `MaterializedMySQL` database, then exits
+
+The `app` container is intentionally excluded. You run that yourself with `npm run dev`, which gives you hot reload and faster iteration.
+
+## Setup
+
+<Steps>
+  <Step title="Start infrastructure services">
+    ```bash
+    npm run docker:infra
+    ```
+
+    Alternatively, use the shell script directly:
+
+    ```bash
+    bash docker-start-infra.sh
+    ```
+
+    Both commands run `docker compose up -d mysql clickhouse minio setup`. Wait for the setup container to finish (roughly 30–60 seconds on first run) before starting the app.
+  </Step>
+
+  <Step title="Configure your local environment">
+    Copy the local development environment template:
+
+    ```bash
+    cp env.local.example .env.local
+    ```
+
+    Open `.env.local` and update the connection strings to point at `127.0.0.1` (where the Docker containers are exposed). Make sure the credential values match what you set in your `.env` file.
+
+    Key settings to verify:
+
+    ```ini
+    MYSQL_HOST=127.0.0.1
+    MYSQL_PORT=3306
+    DATABASE_URL=mysql://bronvault:YOUR_MYSQL_PASSWORD@127.0.0.1:3306/bronvaultnew
+
+    CLICKHOUSE_HOST=http://127.0.0.1:8123
+    CLICKHOUSE_USER=default
+    CLICKHOUSE_PASSWORD=YOUR_CLICKHOUSE_PASSWORD
+    CLICKHOUSE_DATABASE=bronvault_analytics
+    ```
+
+    <Note>
+    The `DATABASE_URL` must use `127.0.0.1`, not `mysql` or `localhost`. The `mysql` hostname only resolves inside the Docker network; your local app process runs outside it.
+    </Note>
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+
+    Skip this step if you have already installed dependencies in a prior session and `node_modules` is present.
+  </Step>
+
+  <Step title="Run the app">
+    <CodeGroup>
+
+    ```bash Standard dev server
+    npm run dev
+    ```
+
+    ```bash Turbopack (faster builds)
+    npm run dev:turbo
+    ```
+
+    </CodeGroup>
+
+    The standard `npm run dev` uses the default Next.js dev server. `npm run dev:turbo` enables [Turbopack](https://turbo.build/pack), which provides faster incremental compilation for large projects.
+
+    Open [http://localhost:3000](http://localhost:3000) once the server reports it is ready.
+  </Step>
+</Steps>
+
+## Service endpoints in development
+
+With this setup, the infrastructure runs in Docker and the app runs on your host. All services are accessible via `127.0.0.1`:
+
+| Service | Address |
+|---|---|
+| Next.js app | [http://localhost:3000](http://localhost:3000) |
+| MySQL | `127.0.0.1:3306` |
+| ClickHouse HTTP API | [http://127.0.0.1:8123](http://127.0.0.1:8123) |
+| MinIO S3 API | [http://localhost:9001](http://localhost:9001) |
+| MinIO Console | [http://localhost:9002](http://localhost:9002) |
+
+MinIO storage settings (endpoint, bucket name, access key, secret key) are configured through the Settings UI inside the app. When using the local Docker MinIO instance, set the endpoint to `http://127.0.0.1:9001`.
+
+## Building for production
+
+To generate a production build locally:
+
+```bash
+npm run build
+```
+
+This runs `next build` with an increased Node.js heap size (`--max-old-space-size=16384`) to handle the full build graph. The output is placed in `.next/` and can be served with `npm run start`.
+
+<Tip>
+Use the production Docker setup (`bash docker-start.sh`) when you want to test the fully containerised deployment rather than just the Next.js build output. See [Docker Setup](/operations/docker-setup) for details.
+</Tip>

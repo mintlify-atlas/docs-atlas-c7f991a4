@@ -1,0 +1,130 @@
+---
+title: 'User management, roles, API keys, and two-factor auth'
+description: 'Administer user accounts, understand the Admin and Analyst roles, create API keys with rate limits, enable two-factor authentication, and review audit logs.'
+---
+
+Broń Vault includes a built-in access control system with two roles, a user management interface for admins, API key management for programmatic access, per-user two-factor authentication, and an audit log for tracking administrative actions. All of this is managed through the web UI — no direct database access is required.
+
+## Roles
+
+There are two built-in roles. Every user account and every API key is assigned exactly one of them.
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield">
+    Full access to the application. Admins can upload log files, manage application settings, create and manage users, configure domain monitors and webhooks, view audit logs, and create API keys.
+  </Card>
+  <Card title="Analyst" icon="eye">
+    Read and search access only. Analysts can use the dashboard, search credentials, explore device details, and run domain discovery queries. They cannot upload files, change settings, manage users, or configure monitors.
+  </Card>
+</CardGroup>
+
+<Note>
+  Access control is enforced on both the UI and API layers. An analyst visiting a restricted page or calling an admin-only API endpoint will receive an access denied response.
+</Note>
+
+## Managing users
+
+The **Users** page (`/users`) is accessible only to admins. It shows all user accounts with their name, email address, role, and active status.
+
+### Creating a user
+
+<Steps>
+  <Step title="Open the Users page">
+    Navigate to **Users** in the sidebar.
+  </Step>
+  <Step title="Click Add User">
+    The create user dialog opens.
+  </Step>
+  <Step title="Fill in the user details">
+    Enter the user's **name**, **email address**, and a temporary **password** (minimum 6 characters). Select a **role** — `Admin` for full access or `Analyst` for read-only access.
+  </Step>
+  <Step title="Click Create User">
+    The account is created and appears in the users table immediately. Share the temporary password with the user and ask them to change it after first login.
+  </Step>
+</Steps>
+
+### Editing a user
+
+Click the pencil icon next to any user to open the edit dialog. You can change the user's name, email address, role, and password. Leave the password field blank to keep the existing password.
+
+### Activating and deactivating accounts
+
+Each user row has a toggle switch that controls whether the account is active. Deactivating an account prevents the user from logging in without deleting their data. You cannot deactivate your own account.
+
+### Deleting a user
+
+Click the trash icon next to a user and confirm the deletion. This action is permanent and cannot be undone. You cannot delete your own account.
+
+## API keys
+
+API keys allow programmatic access to the Broń Vault REST API without a user session. They are managed on the **API Keys** page, accessible to all logged-in users.
+
+Each key has:
+
+- A **name** to identify its purpose
+- A **role** (`admin` or `analyst`) that controls which endpoints it can call
+- An optional **rate limit** (requests per time window)
+- An optional **expiry date** after which the key stops working
+
+Keys are prefixed with `bv_` and can be passed in the `X-API-Key` header or as a `Bearer` token in the `Authorization` header.
+
+<Warning>
+  The full API key value is shown **only once** at creation time. Copy it immediately and store it securely. If you lose a key, revoke it and create a new one.
+</Warning>
+
+### Creating an API key
+
+<Steps>
+  <Step title="Navigate to API Keys">
+    Select **API Keys** from the sidebar.
+  </Step>
+  <Step title="Click Create API Key">
+    The creation dialog opens.
+  </Step>
+  <Step title="Configure the key">
+    Enter a descriptive **name**, select a **role**, and optionally set a **rate limit** (number of requests per window) and an **expiry date**.
+  </Step>
+  <Step title="Copy the key">
+    After clicking **Create**, the full key is displayed once. Copy it to a safe location before closing the dialog.
+  </Step>
+</Steps>
+
+## Two-factor authentication
+
+Users can enable TOTP-based two-factor authentication (2FA) on their own account from the account settings page. Broń Vault supports any TOTP-compatible authenticator app (Google Authenticator, Authy, 1Password, etc.).
+
+### Enabling 2FA
+
+<Steps>
+  <Step title="Open account settings">
+    Click your user name or avatar and navigate to **Account Settings** (or **Profile**).
+  </Step>
+  <Step title="Click Enable Two-Factor Authentication">
+    A QR code is generated for your account.
+  </Step>
+  <Step title="Scan the QR code">
+    Open your authenticator app, add a new account, and scan the QR code. The account will appear as **BronVault** in the app.
+  </Step>
+  <Step title="Confirm with a code">
+    Enter the 6-digit code currently shown in your authenticator app to verify that the setup was successful.
+  </Step>
+  <Step title="Save your backup codes">
+    After confirmation, Broń Vault generates 10 one-time backup codes. Store these securely — they can be used to access your account if you lose access to your authenticator app. Each code can only be used once.
+  </Step>
+</Steps>
+
+### Using backup codes
+
+If you cannot access your authenticator app, enter one of your saved backup codes in place of the TOTP code at the login screen. The code is consumed on use; the remaining codes stay valid.
+
+<Tip>
+  Store backup codes in a password manager or printed in a secure location. If you run low on backup codes, regenerate them from your account settings.
+</Tip>
+
+## Audit logs
+
+The **Audit Logs** page provides a chronological record of administrative actions taken within Broń Vault. This includes user creation and deletion, settings changes, role assignments, and other significant events.
+
+Audit logs are read-only and accessible only to admin accounts. They are useful for tracking who made a change and when, particularly in environments shared by multiple administrators.
+
+Navigate to **Audit Logs** in the sidebar to view the history. Entries show the acting user, the action taken, the affected resource, a timestamp, and the originating IP address.

@@ -1,0 +1,241 @@
+---
+title: "Search by Domain — POST /api/v1/search/domain"
+description: "Search stealer log credentials by domain name. Returns matching credentials, subdomain breakdown, and affected device count with optional subdomain matching."
+---
+
+The domain search endpoint retrieves all credential records associated with a queried domain across every uploaded log archive. It returns the matching credentials alongside a subdomain breakdown and summary statistics. Use this endpoint for asset-discovery workflows—enumerating which subdomains and paths of your domain appear in breach data, and how many devices have credentials for each.
+
+- **Method:** `POST`
+- **Path:** `/api/v1/search/domain`
+- **Auth:** `admin` or `analyst` API key
+
+<Info>
+  The domain you provide is automatically normalized: leading `https://`, `http://`, and `www.` prefixes are stripped, and trailing slashes and port numbers are removed before the query runs.
+</Info>
+
+## Request body
+
+<ParamField body="domain" type="string" required>
+  The domain to search for. Minimum 3 characters after normalization. You may pass a full URL (`https://www.example.com/`), a hostname (`example.com`), or a subdomain (`accounts.example.com`).
+</ParamField>
+
+<ParamField body="includeSubdomains" type="boolean" default="false">
+  When `true`, results include credentials for all subdomains of the queried domain in addition to the exact match. For example, searching `example.com` with `includeSubdomains: true` also returns results from `mail.example.com`, `accounts.example.com`, and so on.
+</ParamField>
+
+<ParamField body="page" type="number" default="1">
+  Page number (1-indexed).
+</ParamField>
+
+<ParamField body="limit" type="number" default="50">
+  Results per page. Maximum is 100.
+</ParamField>
+
+<ParamField body="includePasswords" type="boolean" default="false">
+  When `true`, each result includes the full plaintext `password` field in addition to the masked `passwordMasked` field.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean" required>
+  `true` on a successful response.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="domain" type="string">
+      The normalized domain that was searched.
+    </ResponseField>
+
+    <ResponseField name="credentials" type="object[]">
+      Paginated array of credential records matching the domain query. See credential object fields below.
+    </ResponseField>
+
+    <ResponseField name="pagination" type="object">
+      <Expandable title="properties">
+        <ResponseField name="page" type="number">Current page number.</ResponseField>
+        <ResponseField name="limit" type="number">Results per page.</ResponseField>
+        <ResponseField name="total" type="number">Total matching credential records.</ResponseField>
+        <ResponseField name="totalPages" type="number">Total number of pages.</ResponseField>
+        <ResponseField name="hasMore" type="boolean">Whether additional pages exist.</ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="summary" type="object">
+      <Expandable title="properties">
+        <ResponseField name="totalCredentials" type="number">Total credential records found for the domain.</ResponseField>
+        <ResponseField name="uniqueDevices" type="number">Number of distinct devices that have credentials for this domain.</ResponseField>
+        <ResponseField name="subdomains" type="object[]">
+          Top 20 subdomains by credential count.
+          <Expandable title="subdomain object">
+            <ResponseField name="domain" type="string">The subdomain string.</ResponseField>
+            <ResponseField name="count" type="number">Number of credentials for this subdomain.</ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  <Expandable title="properties">
+    <ResponseField name="searchedDomain" type="string">The normalized domain used for the query.</ResponseField>
+    <ResponseField name="includeSubdomains" type="boolean">Whether subdomain matching was enabled.</ResponseField>
+    <ResponseField name="searchedAt" type="string">ISO 8601 timestamp of when the search ran.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Credential object
+
+<ResponseField name="deviceId" type="string">
+  Unique identifier of the device this credential was extracted from.
+</ResponseField>
+
+<ResponseField name="deviceName" type="string">
+  Human-readable name of the device.
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Full URL where the credential was captured.
+</ResponseField>
+
+<ResponseField name="subdomain" type="string">
+  The `domain` field value from the credential record (the specific subdomain/hostname matched).
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  Captured username or email address.
+</ResponseField>
+
+<ResponseField name="passwordMasked" type="string">
+  Partially masked password. First and last characters are visible; middle characters are replaced with asterisks.
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  Full plaintext password. Only present when `includePasswords: true`.
+</ResponseField>
+
+<ResponseField name="browser" type="string">
+  Browser from which the credential was stolen.
+</ResponseField>
+
+<ResponseField name="country" type="string">
+  Two-letter country code of the device, if available.
+</ResponseField>
+
+<ResponseField name="uploadDate" type="string">
+  Date the archive was uploaded to Broń Vault.
+</ResponseField>
+
+<ResponseField name="hostInfo" type="object">
+  Host system information from the stealer log. All fields are optional.
+  <Expandable title="hostInfo properties">
+    <ResponseField name="os" type="string">Operating system string.</ResponseField>
+    <ResponseField name="ipAddress" type="string">IP address of the victim device.</ResponseField>
+    <ResponseField name="machineUsername" type="string">Windows username on the victim machine.</ResponseField>
+    <ResponseField name="cpu" type="string">CPU model string.</ResponseField>
+    <ResponseField name="ram" type="string">RAM amount string.</ResponseField>
+    <ResponseField name="gpu" type="string">GPU model string.</ResponseField>
+    <ResponseField name="hwid" type="string">Hardware ID of the device.</ResponseField>
+    <ResponseField name="antivirus" type="string">Detected antivirus software.</ResponseField>
+    <ResponseField name="stealerType" type="string">Stealer family that generated the log.</ResponseField>
+    <ResponseField name="logDate" type="string">Date the stealer captured data on the victim device.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error responses
+
+| Code | HTTP | Description |
+|------|------|-------------|
+| `INVALID_REQUEST` | 400 | `domain` is missing or not a string |
+| `DOMAIN_TOO_SHORT` | 400 | Normalized domain is fewer than 3 characters |
+| `INVALID_API_KEY` | 401 | Key is missing or invalid |
+| `SEARCH_ERROR` | 500 | Internal error during query execution |
+
+## Examples
+
+<CodeGroup>
+
+```bash Exact domain search
+curl --request POST \
+  --url http://localhost:3000/api/v1/search/domain \
+  --header "Authorization: Bearer bv_YourApiKeyHere" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "domain": "example.com",
+    "includeSubdomains": false,
+    "page": 1,
+    "limit": 20
+  }'
+```
+
+```bash Including subdomains
+curl --request POST \
+  --url http://localhost:3000/api/v1/search/domain \
+  --header "Authorization: Bearer bv_YourApiKeyHere" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "domain": "example.com",
+    "includeSubdomains": true,
+    "limit": 50
+  }'
+```
+
+</CodeGroup>
+
+### Success response
+
+```json
+{
+  "success": true,
+  "data": {
+    "domain": "example.com",
+    "credentials": [
+      {
+        "deviceId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "deviceName": "DESKTOP-ABC123",
+        "url": "https://accounts.example.com/login",
+        "subdomain": "accounts.example.com",
+        "username": "alice@example.com",
+        "passwordMasked": "p******3",
+        "browser": "Chrome",
+        "country": "US",
+        "uploadDate": "2024-11-15T08:30:00Z",
+        "hostInfo": {
+          "os": "Windows 11 Pro",
+          "ipAddress": "203.0.113.45",
+          "machineUsername": "alice",
+          "cpu": "Intel Core i7-12700",
+          "ram": "16 GB",
+          "gpu": "NVIDIA RTX 3060",
+          "hwid": "A1B2C3D4E5F6",
+          "antivirus": "Windows Defender",
+          "stealerType": "Redline",
+          "logDate": "2024-11-10"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 47,
+      "totalPages": 3,
+      "hasMore": true
+    },
+    "summary": {
+      "totalCredentials": 47,
+      "uniqueDevices": 31,
+      "subdomains": [
+        { "domain": "accounts.example.com", "count": 28 },
+        { "domain": "mail.example.com", "count": 12 },
+        { "domain": "example.com", "count": 7 }
+      ]
+    }
+  },
+  "meta": {
+    "searchedDomain": "example.com",
+    "includeSubdomains": false,
+    "searchedAt": "2024-11-20T12:00:00.000Z"
+  }
+}
+```
